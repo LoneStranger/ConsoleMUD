@@ -130,7 +130,7 @@ function sendPrompt(user)
 function sendDataAll(data)
 {
 	for (var i = 0; i < userList.length; i++) {
-		userList[i].socket.write(data);
+		sendDataThis(userList[i], data)
 	}
 }
 
@@ -147,7 +147,7 @@ function sendDataAllButThis(user, data)
 {
 	for (var i = 0; i < userList.length; i++) {
 		if (userList[i] !== user) {
-			userList[i].socket.write(data);
+			sendDataThis(userList[i], data);
 		}
 	}	
 }

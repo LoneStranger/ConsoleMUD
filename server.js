@@ -1,5 +1,11 @@
+// ConsoleMUD
+// Started 2015-07-12
+// @LnStrngr (headley at lonestranger dot net)
+//
+// Initially based on code from:
 // http://www.davidmclifton.com/2011/07/22/simple-telnet-server-in-node-js/
-
+//
+//
 
 var net = require('net');
 var rl = require('readline');
@@ -33,42 +39,87 @@ mongoClient.connect("mongodb://localhost:27017/MikeMUD", function(err, db) {
 
 function receiveData(user, data) {
 
-	socket = user.socket;
+	//socket = user.socket;
 	var cleanData = cleanInput(data).trim();
 
 	// this checks for any backspaces and removes them, as well as the character before them.
 	for (var i = 0; i < cleanData.length; i++) {
 		if (cleanData[i] === '\b' && (i > 0))
 		{	
+			// as Joey from Full House says, "Cut it out!"
 			cleanData = cleanData.slice(0,i-1) + cleanData.slice(i+1);
 			i -= 2;
 		}
 	}
 
-	console.log("cleanData[" + user.charname + "]: " + querystring.escape(cleanData));
+	console.log("cleanData[" + user.charname + "]: " + cleanData);
 
-	if (cleanData === "@quit") {
-		socket.end('Goodbye!' + newline);
-		sendDataAllButThis(user, user.charname + " vanishes in a puff of smoke.");
+	// check to see if the user has logged in yet.
+	if (user.loginstate === User.prototype.LOGINSTATE_NONE) 	{
+		user.loginstate = User.prototype.LOGINSTATE_ASKUSER;
 	}
-	else if (cleanData.substr(0,4).toLowerCase() === "help")
-	{
-		sendDataThis(user, help);
-		sendPrompt(user);
-	}
-	else if (cleanData.substr(0,4).toLowerCase() === "say ")// || cleanData.toLowerCase().substr(0,1) === "'")
-	{
-		cleanData = cleanData.substr(4);
-		sendDataAllButThis(user, "You hear " + user.charname + " say '" + cleanData + "'" + newline);
-		sendDataThis(user,"You say '" + cleanData + "'" + newline);
+	// Are we asking for the login name?
+	if (user.loginstate === User.prototype.LOGINSTATE_ASKUSER) 	{
 
-		sendPrompt(user);
+		if (cleanData === "user")
+		{
+			user.loginstate = User.prototype.LOGINSTATE_ASKPASS;
+			sendDataThis(user, "login pass: ");
+		} else {
+			sendDataThis(user, "login name: ");
+		}
+
 	}
+	// Are we asking for the login pass?
+	else if (user.loginstate === User.prototype.LOGINSTATE_ASKPASS) {
+
+		if (cleanData === "pass") {
+			user.loginstate = User.prototype.LOGINSTATE_DONE;
+			sendDataThis(user, "Entering world...." + newline);
+			sendPrompt(user);
+		} else {
+			sendDataThis(user, "login pass: ");
+		}
+
+	}
+	// if we get this far, then they should be logged in.
+	else if (user.loginstate === User.prototype.LOGINSTATE_DONE) {
+
+		
+
+		if (cleanData === "@quit") {
+			socket.end('Goodbye!' + newline);
+			sendDataAllButThis(user, user.charname + " vanishes in a puff of smoke.");
+		}
+		else if (cleanData.substr(0,4).toLowerCase() === "help")
+		{
+			sendDataThis(user, help);
+			sendPrompt(user);
+		}
+		else if (cleanData.substr(0,4).toLowerCase() === "say ")// || cleanData.toLowerCase().substr(0,1) === "'")
+		{
+			cleanData = cleanData.substr(4);
+			sendDataAllButThis(user, "You hear " + user.charname + " say '" + cleanData + "'" + newline);
+			sendDataThis(user,"You say '" + cleanData + "'" + newline);
+
+			sendPrompt(user);
+		}
+		else if (cleanData.substr(0,5).toLowerCase() === "name ") {
+			user.changeName(cleanData.substr(5));
+		}
+		else {
+			//sendDataAllButThis(socket, data + newline);
+			sendDataThis(user, "I don't understand." + newline);
+			sendPrompt(user);
+		}
+	}
+	// If we fall down to this part, then we are probably in trouble.
 	else {
-		//sendDataAllButThis(socket, data + newline);
-		sendDataThis(user, "I don't understand." + newline);
-		sendPrompt(user);
+		console.log("Logging in user somehow in a bad state: " + user.loginstate);
 	}
+
+
+
 }
 
 function sendPrompt(user)
@@ -133,7 +184,7 @@ function newSocket(socket)
 	userList.push(thisUser);
 	thisUser.socket.write('Welcome to MikeMUD!' + newline);
 
-	thisUser.socket.write("enter name: ");
+	thisUser.socket.write('login name: ');
 
 	//socket.on('data', function(data) {
 	//	receiveData(socket, data);
@@ -149,6 +200,7 @@ var help = 'These are the following commands that work.' + newline;
 	help += newline;
 	help += " - help              displays this command list." + newline;
 	help += " - say [text]        says the text to everyone in the room." + newline;
+	help += " - name [text]       changes your name" + newline;
 
 
 var server = net.createServer(newSocket);

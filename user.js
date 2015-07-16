@@ -7,7 +7,7 @@ User.prototype.LOGINSTATE_DONE = 3;
 // constructor
 function User(socket) {
 
-	var UserModel = {charname:String, loginname:String, password:String, loginstate:Number };
+	var UserModel = {username:String, login:String, password:String, loginstate:Number };
 
 
 
@@ -23,10 +23,4 @@ User.prototype.changeName = function(newname) {
 	this.charname = newname;
 };
 
-User.prototype.loadData = function(userCollection, loginname) {
-	console.log("Loading data for login: " + loginname);
-
-	userCollection.find({user:loginname}, {limit:1});
-
-};
 module.exports = User;

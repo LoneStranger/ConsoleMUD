@@ -24,8 +24,16 @@ mongoClient.connect("mongodb://localhost:27017/MikeMUD", function(err, db) {
 	if (!err) {
 		console.log("Connected to MikeMUD DB");
 
-		//userCollection = db.collection('userCollection', function(err, collection) {});
+		userCollection = db.collection('userCollection', function(err, collection) {
 
+			//collection.insert( [{'loginname':'user', 'charname':'charName', 'password':'pass', 'loginstate':0}], function (err, result) {
+			//	console.log("inserted");
+			//	//callback(result);
+			//});
+
+		});
+
+		
 
 
 	}
@@ -38,6 +46,7 @@ mongoClient.connect("mongodb://localhost:27017/MikeMUD", function(err, db) {
 
 
 function receiveData(user, data) {
+
 
 	//socket = user.socket;
 	var cleanData = cleanInput(data).trim();
@@ -52,7 +61,7 @@ function receiveData(user, data) {
 		}
 	}
 
-	console.log("cleanData[" + user.charname + "]: " + cleanData);
+	console.log("cleanData[" + user.loginname + ":" + user.charname + "]: " + cleanData);
 
 	// check to see if the user has logged in yet.
 	if (user.loginstate === User.prototype.LOGINSTATE_NONE) 	{
@@ -61,25 +70,67 @@ function receiveData(user, data) {
 	// Are we asking for the login name?
 	if (user.loginstate === User.prototype.LOGINSTATE_ASKUSER) 	{
 
-		if (cleanData === "user")
-		{
-			user.loginstate = User.prototype.LOGINSTATE_ASKPASS;
-			sendDataThis(user, "login pass: ");
-		} else {
-			sendDataThis(user, "login name: ");
-		}
+		console.log("Looking for: " + cleanData);
+		var cursor = userCollection.find( { 'loginname':cleanData }, {limit:1} );
+		//console.log("found: " + cursor);
+
+		cursor.toArray(function(err, doc)  {
+			console.log("doc: " + doc.length);
+			if (doc[0] != null) {
+				console.log("Cursor Doc: ");
+				console.dir(doc[0]);
+				user.loginname = doc[0].loginname;
+				user.loginstate = User.prototype.LOGINSTATE_ASKPASS;
+				sendDataThis(user, "login pass: ");
+			}
+			else {
+				sendDataThis(user, "login name: ");
+			}
+
+		});		
+
+
+		//if (cleanData === "user")
+		//{
+		//	user.loginstate = User.prototype.LOGINSTATE_ASKPASS;
+		//	sendDataThis(user, "login pass: ");
+		//} else {
+		//	sendDataThis(user, "login name: ");
+		//}
 
 	}
 	// Are we asking for the login pass?
 	else if (user.loginstate === User.prototype.LOGINSTATE_ASKPASS) {
 
-		if (cleanData === "pass") {
-			user.loginstate = User.prototype.LOGINSTATE_DONE;
-			sendDataThis(user, "Entering world...." + newline);
-			sendPrompt(user);
-		} else {
-			sendDataThis(user, "login pass: ");
-		}
+		console.log("looking for " + user.loginname + " and " + cleanData);
+		var cursor = userCollection.find( { 'loginname':user.loginname, 'password':cleanData }, {limit:1} );
+
+		cursor.toArray(function(err, doc)  {
+			console.log("doc: " + doc.length);
+			if (doc[0] != null) {
+				console.log("Cursor Doc: ");
+				console.dir(doc);
+				// unlike with the user name, we don't want to store the password in memory.
+				user.loginstate = User.prototype.LOGINSTATE_DONE;
+
+				user.loadData(userCollection, user.loginname);
+
+				sendDataThis(user, "Entering world...." + newline);
+				sendPrompt(user);
+			}
+			else {
+				sendDataThis(user, "login pass: ");
+			}
+		});
+
+	
+		//if (cleanData === "pass") {
+		//	user.loginstate = User.prototype.LOGINSTATE_DONE;
+		//	sendDataThis(user, "Entering world...." + newline);
+		//	sendPrompt(user);
+		//} else {
+		//	sendDataThis(user, "login pass: ");
+		//}
 
 	}
 	// if we get this far, then they should be logged in.
